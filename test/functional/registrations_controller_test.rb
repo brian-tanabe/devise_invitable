@@ -16,7 +16,7 @@ class DeviseInvitable::RegistrationsControllerTest < ActionController::TestCase
   test "invited users may still sign up directly by themselves" do
     # invite the invitee
     sign_in @issuer
-    invitee_email = 'invitee@example.org'
+    invitee_email = "#{SecureRandom.uuid}@example2.org"
 
     User.invite!(email: invitee_email) do |u|
       u.skip_invitation = true
@@ -80,6 +80,9 @@ class DeviseInvitable::RegistrationsControllerTest < ActionController::TestCase
   end
 
   test "not invitable resources can register" do
+    # Create a random Admin so the table is created. It won't actually be used
+    Admin.create!(email: "#{SecureRandom.uuid}@domain.com", password: SecureRandom)
+
     @request.env['devise.mapping'] = Devise.mappings[:admin]
     invitee_email = 'invitee@example.org'
 
@@ -92,6 +95,9 @@ class DeviseInvitable::RegistrationsControllerTest < ActionController::TestCase
   end
 
   test "not invitable resources are not logged in after sign up again" do
+    # Create a user. We won't actually use this but need the table to be created
+    # Admin.create!(email: "#{SecureRandom.uuid}@example.org", password: SecureRandom.uuid)
+
     @request.env['devise.mapping'] = Devise.mappings[:admin]
     invitee_email = 'invitee@example.org'
 

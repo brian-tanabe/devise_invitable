@@ -9,7 +9,7 @@ class InvitationMailTest < ActionMailer::TestCase
   end
 
   def user
-    @user ||= User.invite!(:email => "valid@email.com")
+    @user ||= User.invite!(:email => "#{SecureRandom.uuid}@email.com")
   end
 
   def mail
@@ -36,13 +36,13 @@ class InvitationMailTest < ActionMailer::TestCase
   end
 
   test 'setup subject from I18n' do
-    store_translations :en, :devise => { :mailer => { :invitation_instructions => { :subject => 'Localized Invitation' } } } do
+    store_translations :en, :devise => { :mailer => { :invitation_instructions => { subject: 'Localized Invitation' } } } do
       assert_equal 'Localized Invitation', mail.subject
     end
   end
 
   test 'subject namespaced by model' do
-    store_translations :en, :devise => { :mailer => { :invitation_instructions => { :user_subject => 'User Invitation' } } } do
+    store_translations :en, :devise => { :mailer => { :invitation_instructions => { user_subject: 'User Invitation' } } } do
       assert_equal 'User Invitation', mail.subject
     end
   end

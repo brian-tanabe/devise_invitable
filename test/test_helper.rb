@@ -9,6 +9,11 @@ require "orm/#{DEVISE_ORM}"
 require 'capybara/rails'
 require 'mocha/setup'
 
+# Enables better test outputs
+# https://github.com/minitest-reporters/minitest-reporters
+require "minitest/reporters"
+Minitest::Reporters.use! [Minitest::Reporters::SpecReporter.new, Minitest::Reporters::JUnitReporter.new, Minitest::Reporters::HtmlReporter.new]
+
 ActionMailer::Base.delivery_method = :test
 ActionMailer::Base.perform_deliveries = true
 ActionMailer::Base.default_url_options[:host] = 'example.com'

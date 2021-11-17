@@ -9,7 +9,19 @@ class Octopussy < PARENT_MODEL_CLASS
     field :encrypted_password, type: String, default: ""
     validates_presence_of :email
     validates_presence_of :encrypted_password, if: :password_required?
+  elsif DEVISE_ORM == :dynamoid
+    include Dynamoid::Document
+
+    ## Database authenticatable
+    field :email, :string, default: ""
+    field :encrypted_password, :string, default: ""
+    validates_presence_of :email
+    validates_presence_of :encrypted_password, if: :password_required?
   end
 
-  devise :database_authenticatable, :validatable, :confirmable
+  if DEVISE_ORM == :dynamoid
+    devise :database_authenticatable, :confirmable
+  else
+    devise :database_authenticatable, :validatable, :confirmable
+  end
 end

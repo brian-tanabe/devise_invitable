@@ -1,0 +1,9 @@
+defaults: &defaults
+  secret_key_base: <%%= ENV["SECRET_KEY_BASE"] %>
+  dynamodb_api_verison: '2012-08-10'
+  region: 'us-west-2'
+
+test:
+  <<: *defaults
+  endpoint: 'http://localhost:8000'
+  region: 'localhost'
