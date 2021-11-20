@@ -31,7 +31,7 @@ module DeviseInvitable
         def initialize(resource_class, resource_name, params)
           super
           permit(:invite, keys: (resource_class.respond_to?(:invite_key_fields) ? resource_class.invite_key_fields : []) )
-          permit(:accept_invitation, keys: [:password, :password_confirmation, :invitation_token] )
+          permit(:accept_invitation, keys: [:name, :password, :password_confirmation, :invitation_token] )
         end
       end
   end
