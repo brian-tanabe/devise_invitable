@@ -35,7 +35,6 @@ class User < PARENT_MODEL_CLASS
         field :invitation_limit, :integer
         field :invited_by_id, :integer
         field :invited_by_type, :string
-        field :invited_by, :string
 
         field :username, :string
         field :profile_id, :string

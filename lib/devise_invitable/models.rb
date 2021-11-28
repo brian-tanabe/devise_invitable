@@ -62,6 +62,10 @@ module Devise
                     def no_active_invitation
                         lambda { where(invitation_token: nil) }
                     end
+
+                    def invitation_accepted
+                        lambda { where('invitation_accepted_at.ne': nil) }
+                    end
                 end
                 if defined?(Mongoid) && defined?(Mongoid::Document) && self < Mongoid::Document
                     scope :created_by_invite, lambda { where(:invitation_created_at.ne => nil) }
@@ -177,6 +181,7 @@ module Devise
 
                 # TODO: REMOVE THIS DEBUGGING STATEMENT
                 # puts "invite! block_given?=[#{block_given?.inspect}], no_token=[#{no_token_present_or_skip_invitation?.inspect}]"
+                # puts "invite! self.invited_by=[#{self.invited_by.inspect}], invited_by=[#{invited_by.inspect}]"
 
                 yield self if block_given?
                 generate_invitation_token if no_token_present_or_skip_invitation?
@@ -184,7 +189,8 @@ module Devise
                 run_callbacks :invitation_created do
                     self.invitation_created_at = Time.now.utc
                     self.invitation_sent_at = self.invitation_created_at unless skip_invitation
-                    self.invited_by = invited_by if invited_by
+                    self.invited_by_id = invited_by.id unless invited_by.nil?
+                    self.invited_by_type = invited_by.class.name if invited_by
 
                     # Call these before_validate methods since we aren't validating on save
                     self.downcase_keys if new_record_and_responds_to?(:downcase_keys)
@@ -224,6 +230,9 @@ module Devise
             end
 
             def clear_reset_password_token
+                # TODO: REMOVE THIS DEBUGGING STATEMENT
+                # puts "clear_reset_password_token: inside"
+
                 reset_password_token_present = reset_password_token.present?
                 super
                 accept_invitation! if reset_password_token_present && invited_to_sign_up?
@@ -417,6 +426,7 @@ module Devise
                             end
                         end
 
+                        invitable.password = attributes[:password]
                         invitable.accept_invitation!
                     end
                     invitable

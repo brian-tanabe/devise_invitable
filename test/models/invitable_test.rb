@@ -620,8 +620,13 @@ class InvitableTest < ActiveSupport::TestCase
     inviting_user = User.new(email: "#{SecureRandom.uuid}@email.com")
     inviting_user.save(validate: false)
     user.invite!(inviting_user)
-    assert_equal inviting_user, user.invited_by
     assert_equal inviting_user.class.to_s, user.invited_by_type
+
+    # TODO: REMOVE THIS DEBUGGING STATEMENT
+    # puts "inviting_user=[#{inviting_user.inspect}]"
+    # puts "user=[#{user.inspect}]"
+
+    assert_equal inviting_user, user.invited_by
   end
 
   test 'user.accept_invitation! should trigger callbacks' do

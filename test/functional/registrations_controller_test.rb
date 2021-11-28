@@ -14,13 +14,16 @@ class DeviseInvitable::RegistrationsControllerTest < ActionController::TestCase
   end
 
   test "invited users may still sign up directly by themselves" do
+    # Create a user. We won't actually use this but need the table to be created
+    User.create!(email: "#{SecureRandom.uuid}@example.org")
+
     # invite the invitee
     sign_in @issuer
-    invitee_email = "#{SecureRandom.uuid}@example2.org"
+    invitee_email = "#{SecureRandom.uuid}@example.org"
 
     User.invite!(email: invitee_email) do |u|
       u.skip_invitation = true
-      u.invited_by = @issuer
+      u.invited_by = @issuer.id
     end
     sign_out @issuer
 
