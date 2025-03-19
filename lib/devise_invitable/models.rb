@@ -485,4 +485,3 @@ module Devise
         end
     end
 end
-end
