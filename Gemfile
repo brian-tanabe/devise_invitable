@@ -5,17 +5,17 @@ gemspec
 
 group :test do
   platforms :jruby do
-    gem 'activerecord-jdbcsqlite3-adapter'
+    gem 'activerecord-jdbcsqlite3-adapter', '~> 52.1'
   end
 
   platforms :ruby do
-    gem 'sqlite3'
+    gem 'sqlite3', '~> 1.4'
   end
 
-  gem 'actionmailer'
-  gem 'activerecord'
+  gem 'actionmailer', '~> 7.0.0'
+  gem 'activerecord', '~> 7.0.0'
   gem 'capybara'
-  gem 'devise'
+  gem 'devise', '~> 4.7'
   gem 'mocha'
   gem 'mongoid' # gem 'mongoid', github: 'mongoid/mongoid', branch: 'master'
   gem 'dynamoid'

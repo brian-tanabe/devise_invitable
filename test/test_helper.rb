@@ -7,7 +7,7 @@ require "rails_app/config/environment"
 require 'rails/test_help'
 require "orm/#{DEVISE_ORM}"
 require 'capybara/rails'
-require 'mocha/setup'
+require 'mocha/minitest'
 
 # Enables better test outputs
 # https://github.com/minitest-reporters/minitest-reporters
@@ -18,7 +18,9 @@ ActionMailer::Base.delivery_method = :test
 ActionMailer::Base.perform_deliveries = true
 ActionMailer::Base.default_url_options[:host] = 'example.com'
 
-ActiveSupport::Deprecation.silenced = true
+if ActiveSupport::Deprecation.respond_to?(:silenced=)
+  ActiveSupport::Deprecation.silenced = true
+end
 $VERBOSE = false
 
 class ActionDispatch::IntegrationTest

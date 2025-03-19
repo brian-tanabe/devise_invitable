@@ -30,12 +30,12 @@ module Devise
 
             included do
                 include ::DeviseInvitable::Inviter
-                belongs_to_options = if Devise.invited_by_class_name
-                                         { class_name: Devise.invited_by_class_name }
+                belongs_to_options = if invited_by_class_name
+                                         { class_name: invited_by_class_name }
                                      else
                                          { polymorphic: true }
                                      end
-                if fk = Devise.invited_by_foreign_key
+                if fk = invited_by_foreign_key
                     belongs_to_options[:foreign_key] = fk
                 end
                 if defined?(ActiveRecord) && defined?(ActiveRecord::Base) && self < ActiveRecord::Base
@@ -77,10 +77,10 @@ module Devise
                     scope :invitation_accepted, lambda { where(arel_table[:invitation_accepted_at].not_eq(nil)) }
 
                     callbacks = [
-                      :before_invitation_created,
-                      :after_invitation_created,
-                      :before_invitation_accepted,
-                      :after_invitation_accepted,
+                        :before_invitation_created,
+                        :after_invitation_created,
+                        :before_invitation_accepted,
+                        :after_invitation_accepted,
                     ]
 
                     callbacks.each do |callback_method|
@@ -104,9 +104,9 @@ module Devise
 
             def self.required_fields(klass)
                 fields = [:invitation_token, :invitation_created_at, :invitation_sent_at, :invitation_accepted_at,
-                          :invitation_limit, Devise.invited_by_foreign_key || :invited_by_id, :invited_by_type]
+                          :invitation_limit, klass.invited_by_foreign_key || :invited_by_id, :invited_by_type]
                 fields << :invitations_count if defined?(ActiveRecord) && self < ActiveRecord::Base
-                fields -= [:invited_by_type] if Devise.invited_by_class_name
+                fields -= [:invited_by_type] if klass.invited_by_class_name
                 fields
             end
 
@@ -196,7 +196,8 @@ module Devise
                     self.downcase_keys if new_record_and_responds_to?(:downcase_keys)
                     self.strip_whitespace if new_record_and_responds_to?(:strip_whitespace)
 
-                    if save(validate: false)
+                    validate = options.key?(:validate) ? options[:validate] : self.class.validate_on_invite
+                    if save(validate: validate)
                         self.invited_by.decrement_invitation_limit! if !was_invited and self.invited_by.present?
                         deliver_invitation(options) unless skip_invitation
                     end
@@ -235,7 +236,7 @@ module Devise
 
                 reset_password_token_present = reset_password_token.present?
                 super
-                accept_invitation! if reset_password_token_present && invited_to_sign_up?
+                accept_invitation! if reset_password_token_present && valid_invitation?
             end
 
             def clear_errors_on_valid_keys
@@ -391,6 +392,7 @@ module Devise
                     # puts "_invite: valid?=[#{invitable.errors.empty?}], invitable=[#{invitable.inspect}]"
                     # puts "_invite: mail=[#{mail.inspect}], invitable=[#{invitable.inspect}]"
 
+                    mail = invitable.invite!(nil, options.merge(validate: false)) if invitable.errors.empty?
                     [invitable, mail]
                 end
 
@@ -420,68 +422,67 @@ module Devise
                     original_token = attributes.delete(:invitation_token)
                     invitable = find_by_invitation_token(original_token, false)
                     if invitable.errors.empty?
-                        invitable.class.attributes.each_with_object({}) do |(attribute, options), res|
-                            if attributes.key?(attribute)
-                                invitable[attribute] = attributes[attribute]
-                            end
-                        end
-
-                        invitable.password = attributes[:password]
+                        invitable.assign_attributes(attributes)
                         invitable.accept_invitation!
                     end
-                    invitable
+
+                    invitable.password = attributes[:password]
+                    invitable.accept_invitation!
                 end
 
-                def find_by_invitation_token(original_token, only_valid)
-                    invitation_token = Devise.token_generator.digest(self, :invitation_token, original_token)
+                invitable
+            end
 
-                    invitable = find_or_initialize_with_error_by(:invitation_token, invitation_token)
-                    invitable.errors.add(:invitation_token, :invalid) if invitable.invitation_token && invitable.persisted? && !invitable.valid_invitation?
-                    invitable unless only_valid && invitable.errors.present?
-                end
+            def find_by_invitation_token(original_token, only_valid)
+                invitation_token = Devise.token_generator.digest(self, :invitation_token, original_token)
 
-                # Callback convenience methods
-                def before_invitation_created(*args, &blk)
-                    set_callback(:invitation_created, :before, *args, &blk)
-                end
+                invitable = find_or_initialize_with_error_by(:invitation_token, invitation_token)
+                invitable.errors.add(:invitation_token, :invalid) if invitable.invitation_token && invitable.persisted? && !invitable.valid_invitation?
+                invitable unless only_valid && invitable.errors.present?
+            end
 
-                def after_invitation_created(*args, &blk)
-                    set_callback(:invitation_created, :after, *args, &blk)
-                end
+            # Callback convenience methods
+            def before_invitation_created(*args, &blk)
+                set_callback(:invitation_created, :before, *args, &blk)
+            end
 
-                def before_invitation_accepted(*args, &blk)
-                    set_callback(:invitation_accepted, :before, *args, &blk)
-                end
+            def after_invitation_created(*args, &blk)
+                set_callback(:invitation_created, :after, *args, &blk)
+            end
 
-                def after_invitation_accepted(*args, &blk)
-                    set_callback(:invitation_accepted, :after, *args, &blk)
-                end
+            def before_invitation_accepted(*args, &blk)
+                set_callback(:invitation_accepted, :before, *args, &blk)
+            end
 
-                Devise::Models.config(self, :invite_for)
-                Devise::Models.config(self, :validate_on_invite)
-                Devise::Models.config(self, :invitation_limit)
-                Devise::Models.config(self, :invite_key)
-                Devise::Models.config(self, :resend_invitation)
-                Devise::Models.config(self, :invited_by_class_name)
-                Devise::Models.config(self, :invited_by_foreign_key)
-                Devise::Models.config(self, :invited_by_counter_cache)
-                Devise::Models.config(self, :allow_insecure_sign_in_after_accept)
-                Devise::Models.config(self, :require_password_on_accepting)
+            def after_invitation_accepted(*args, &blk)
+                set_callback(:invitation_accepted, :after, *args, &blk)
+            end
 
-                private
+            Devise::Models.config(self, :invite_for)
+            Devise::Models.config(self, :validate_on_invite)
+            Devise::Models.config(self, :invitation_limit)
+            Devise::Models.config(self, :invite_key)
+            Devise::Models.config(self, :resend_invitation)
+            Devise::Models.config(self, :invited_by_class_name)
+            Devise::Models.config(self, :invited_by_foreign_key)
+            Devise::Models.config(self, :invited_by_counter_cache)
+            Devise::Models.config(self, :allow_insecure_sign_in_after_accept)
+            Devise::Models.config(self, :require_password_on_accepting)
 
-                # The random password, as set after an invitation, must conform
-                # to any password format validation rules of the application.
-                # This default fixes the most common scenarios: Passwords must contain
-                # lower + upper case, a digit and a symbol.
-                # For more unusual rules, this method can be overridden.
-                def random_password
-                    length = respond_to?(:password_length) ? password_length : Devise.password_length
+            private
 
-                    prefix = 'aA1!'
-                    prefix + Devise.friendly_token(length.last - prefix.length)
-                end
+            # The random password, as set after an invitation, must conform
+            # to any password format validation rules of the application.
+            # This default fixes the most common scenarios: Passwords must contain
+            # lower + upper case, a digit and a symbol.
+            # For more unusual rules, this method can be overridden.
+            def random_password
+                length = respond_to?(:password_length) ? password_length : Devise.password_length
+
+                prefix = 'aA1!'
+                prefix + Devise.friendly_token(length.last - prefix.length)
             end
         end
     end
+end
 end

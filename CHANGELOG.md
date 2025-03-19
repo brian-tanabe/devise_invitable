@@ -1,3 +1,22 @@
+- Use invited_by_class_name and invited_by_foreign_key settings from the model
+
+## 2.0.9
+- Do not accept expired invitation on password reset ([#897](https://github.com/scambra/devise_invitable/pull/897))
+
+## 2.0.8
+- Fix for turbo stream
+
+## 2.0.7
+- Allow customizing invalid_token_path_for, the path to redirect users who try to accept with invalid token
+- Don't override registrations controller in routes if module option is used
+- Fix typo in spanish translation, add Catalan translation ([#857](https://github.com/scambra/devise_invitable/pull/857))
+- Fix for ruby 3.2.0
+
+## 2.0.6
+- Fix submit form failure with turbolinks, fixes ([#865](https://github.com/scambra/devise_invitable/issues/865))
+- Fix obsolete symbols in German translation ([#864](https://github.com/scambra/devise_invitable/pull/864))
+- Allow to provide validate option to the instance method "invite!", default to follow the setting validate_on_invite
+
 ## 2.0.5
 - Fix NoMethodError in random_password when validatable is not used ([#850](https://github.com/scambra/devise_invitable/pull/850))
 

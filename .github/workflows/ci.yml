@@ -1,0 +1,65 @@
+name: Build
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: Ruby ${{ matrix.ruby }} / Rails ${{ matrix.rails }} / ORM ${{ matrix.orm }}
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ["3.3", "3.2", "3.1", "3.0", "2.7", jruby-9.4, ruby-head]
+        rails: ["7.2", "7.1", "7.0", "6.1", main]
+        orm: [active_record, mongoid]
+        exclude:
+          - ruby: ruby-head
+            rails: "6.1"
+          - ruby: ruby-head
+            rails: "7.0"
+          - ruby: "2.7"
+            rails: "7.1"
+          - ruby: "2.7"
+            rails: "7.2"
+          - ruby: "3.0"
+            rails: "7.1"
+          - ruby: "3.0"
+            rails: "7.2"
+          - ruby: "2.7"
+            rails: main
+          - ruby: "3.0"
+            rails: main
+          - ruby: "3.1"
+            rails: main
+          - ruby: jruby-9.4 # no jdbc-adapter > 70.x
+            rails: "7.1"
+            orm: active_record
+          - ruby: jruby-9.4 # no jdbc-adapter > 70.x
+            rails: "7.2"
+            orm: active_record
+          - ruby: ruby-head
+            orm: mongoid
+          - rails: main
+            orm: mongoid
+          - rails: main # many errors, probably devise issues
+            orm: active_record
+
+    runs-on: 'ubuntu-latest'
+
+    env:
+      BUNDLE_GEMFILE: gemfiles/Gemfile.rails-${{ matrix.rails }}
+      RUBYOPT: "--disable-error_highlight"
+      DEVISE_ORM: ${{ matrix.orm }}
+
+    services:
+      mongodb:
+        image: mongo
+        ports:
+        - 27017:27017
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true # 'bundle install' and cache
+      - name: Run test
+        run: bundle exec rake test

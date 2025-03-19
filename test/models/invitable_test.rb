@@ -94,7 +94,7 @@ class InvitableTest < ActiveSupport::TestCase
       user.invite!
       refute_equal old_invitation_sent_at, user.invitation_sent_at
       refute_equal old_invitation_created_at, user.invitation_created_at
-      user.update_attributes(invitation_sent_at: old_invitation_sent_at, invitation_created_at: old_invitation_created_at)
+      user.update(invitation_sent_at: old_invitation_sent_at, invitation_created_at: old_invitation_created_at)
     end
   end
 
@@ -295,6 +295,23 @@ class InvitableTest < ActiveSupport::TestCase
     refute_predicate user, :invited_to_sign_up?
   end
 
+  test 'should not accept expired invitation while resetting the password' do
+    User.stubs(:invite_for).returns(1.day)
+    user = User.invite!(email: "#{SecureRandom.uuid}@email.com")
+    assert user.invited_to_sign_up?
+    user.invitation_created_at = Time.now.utc - 2.days
+    token, user.reset_password_token = Devise.token_generator.generate(User, :reset_password_token)
+    user.reset_password_sent_at = Time.now.utc
+    user.save
+
+    assert user.reset_password_token.present?
+    assert user.invitation_token.present?
+    User.reset_password_by_token(reset_password_token: token, password: '123456789', password_confirmation: '123456789')
+    assert_nil user.reload.reset_password_token
+    assert user.reload.invitation_token.present?
+    assert user.reload.invited_to_sign_up?
+  end
+
   test 'should not accept invitation on failing to reset the password' do
     user = User.invite!(email: "#{SecureRandom.uuid}@email.com")
     assert user.invited_to_sign_up?
@@ -383,6 +400,42 @@ class InvitableTest < ActiveSupport::TestCase
     User.validate_on_invite = validate_on_invite
   end
 
+  test 'should not validate other attributes when validate_on_invite is disabled (for instance method)' do
+    validate_on_invite = User.validate_on_invite
+    User.validate_on_invite = false
+    user = new_user(email: "#{SecureRandom.uuid}@email.com", username: 'a' * 50)
+    user.invite!(nil, validate: false)
+    assert_empty user.errors
+    User.validate_on_invite = validate_on_invite
+  end
+
+  test 'should validate other attributes when validate_on_invite is disabled and validate option is enabled (for instance method)' do
+    validate_on_invite = User.validate_on_invite
+    User.validate_on_invite = false
+    user = new_user(email: "#{SecureRandom.uuid}@email.com", username: 'a' * 50)
+    user.invite!(nil, validate: true)
+    refute_empty user.errors[:username]
+    User.validate_on_invite = validate_on_invite
+  end
+
+  test 'should validate other attributes when validate_on_invite is enabled and validate option is disabled (for instance method)' do
+    validate_on_invite = User.validate_on_invite
+    User.validate_on_invite = true
+    user = new_user(email: "#{SecureRandom.uuid}@email.com", username: 'a' * 50)
+    user.invite!
+    refute_empty user.errors[:username]
+    User.validate_on_invite = validate_on_invite
+  end
+
+  test 'should validate other attributes when validate_on_invite is enabled and validate option is disabled explicitly (for instance method)' do
+    validate_on_invite = User.validate_on_invite
+    User.validate_on_invite = true
+    user = new_user(email: "#{SecureRandom.uuid}@email.com", username: 'a' * 50)
+    user.invite!(nil, validate: false)
+    assert_empty user.errors
+    User.validate_on_invite = validate_on_invite
+  end
+
   test 'should return a record with errors if user was found by e-mail' do
     email_address = "#{SecureRandom.uuid}@email.com"
     existing_user = User.new(email: email_address)
@@ -406,7 +459,7 @@ class InvitableTest < ActiveSupport::TestCase
 
       user = User.invite!(email: existing_user.email)
       assert_equal user, existing_user
-      # assert_equal ['has already been taken'], user.errors[:email]
+      assert_equal [{error: :taken}], user.errors.details[:email]
     ensure
       User.resend_invitation = resend_invitation
     end
@@ -420,7 +473,7 @@ class InvitableTest < ActiveSupport::TestCase
       existing_user.save(validate: false)
       user = User.invite!(email: existing_user.email, username: 'a' * 50)
       assert_equal user, existing_user
-      # assert_equal ['has already been taken'], user.errors[:email]
+      assert_equal [{error: :taken}], user.errors.details[:email]
       refute_empty user.errors[:username]
     ensure
       User.validate_on_invite = validate_on_invite
@@ -430,13 +483,13 @@ class InvitableTest < ActiveSupport::TestCase
   test 'should return a new record with errors if e-mail is blank' do
     invited_user = User.invite!(email: '')
     assert invited_user.new_record?
-    assert_equal ["can't be blank"], invited_user.errors[:email]
+    assert_equal [{error: :blank}], invited_user.errors.details[:email]
   end
 
   test 'should return a new record with errors if e-mail is invalid' do
     invited_user = User.invite!(email: SecureRandom.uuid)
     assert invited_user.new_record?
-    assert_equal ['is invalid'], invited_user.errors[:email]
+    assert_equal [{error: :invalid}], invited_user.errors.details[:email]
   end
 
   test 'should set all attributes with errors if e-mail is invalid' do
@@ -456,13 +509,13 @@ class InvitableTest < ActiveSupport::TestCase
   test 'should return a new record with errors if no invitation_token is found' do
     invited_user = User.accept_invitation!(invitation_token: 'invalid_token')
     assert invited_user.new_record?
-    assert_equal ['is invalid'], invited_user.errors[:invitation_token]
+    assert_equal [{error: :invalid}], invited_user.errors.details[:invitation_token]
   end
 
   test 'should return a new record with errors if invitation_token is blank' do
     invited_user = User.accept_invitation!(invitation_token: '')
     assert invited_user.new_record?
-    assert_equal ["can't be blank"], invited_user.errors[:invitation_token]
+    assert_equal [{error: :blank}], invited_user.errors.details[:invitation_token]
   end
 
   test 'should return record with errors if invitation_token has expired' do
@@ -472,7 +525,7 @@ class InvitableTest < ActiveSupport::TestCase
     invited_user.save(validate: false)
     user = User.accept_invitation!(invitation_token: Thread.current[:token])
     assert_equal user, invited_user
-    assert_equal ['is invalid'], user.errors[:invitation_token]
+    assert_equal [{error: :invalid}], user.errors.details[:invitation_token]
   end
 
   test 'should allow record modification using block' do
